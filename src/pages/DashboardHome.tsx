@@ -10,7 +10,8 @@ import {
     BookMarked,
     Plus,
     Edit,
-    Trash2
+    Trash2,
+    TrendingUp,
 } from 'lucide-react'
 import api from '@/utils/axios'
 
@@ -23,8 +24,32 @@ interface Category {
     updated_at: string
 }
 
+interface DashboardStats {
+    total_books: number
+    available_books: number
+    active_borrowers: number
+    total_transactions: number
+}
+
+interface QuickStats {
+    books_added_today: number
+    books_borrowed_today: number
+    books_returned_today: number
+}
+
 export default function DashboardHome() {
     const [categories, setCategories] = useState<Category[]>([])
+    const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+        total_books: 0,
+        available_books: 0,
+        active_borrowers: 0,
+        total_transactions: 0
+    })
+    const [quickStats, setQuickStats] = useState<QuickStats>({
+        books_added_today: 0,
+        books_borrowed_today: 0,
+        books_returned_today: 0
+    })
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState('')
     const [showForm, setShowForm] = useState(false)
@@ -36,13 +61,52 @@ export default function DashboardHome() {
         who_edited: ''
     })
 
+    // Stats cards configuration
     const stats = [
-        { title: 'Total Books', value: '0', icon: BookOpen, color: 'bg-blue-500' },
-        { title: 'Available Books', value: '0', icon: BookMarked, color: 'bg-green-500' },
-        { title: 'Active Borrowers', value: '0', icon: Users, color: 'bg-purple-500' },
-        { title: 'Transactions', value: '0', icon: ArrowLeftRight, color: 'bg-orange-500' }
+        {
+            title: 'Total Books',
+            value: dashboardStats.total_books.toString(),
+            icon: BookOpen,
+            color: 'bg-blue-500',
+            description: 'All books in library'
+        },
+        {
+            title: 'Available Books',
+            value: dashboardStats.available_books.toString(),
+            icon: BookMarked,
+            color: 'bg-green-500',
+            description: 'Ready to borrow'
+        },
+        {
+            title: 'Active Borrowers',
+            value: dashboardStats.active_borrowers.toString(),
+            icon: Users,
+            color: 'bg-purple-500',
+            description: 'Currently borrowing'
+        },
+        {
+            title: 'Total Transactions',
+            value: dashboardStats.total_transactions.toString(),
+            icon: ArrowLeftRight,
+            color: 'bg-orange-500',
+            description: 'All-time transactions'
+        }
     ]
 
+    // Fetch dashboard summary
+    const fetchDashboardSummary = async () => {
+        try {
+            const response = await api.get('/dashboard/summary')
+            if (response.data.success) {
+                setDashboardStats(response.data.data)
+            }
+        } catch (error: any) {
+            console.error('Error fetching dashboard summary:', error)
+            setError('Failed to fetch dashboard data')
+        }
+    }
+
+    // Fetch categories
     const fetchCategories = async () => {
         try {
             const response = await api.get('/categories')
@@ -55,8 +119,25 @@ export default function DashboardHome() {
         }
     }
 
+    // Fetch quick stats (you might want to create a separate endpoint for this)
+    const fetchQuickStats = async () => {
+        try {
+            // This is a placeholder - you might want to create a separate endpoint for today's stats
+            // For now, we'll use mock data
+            setQuickStats({
+                books_added_today: 2,
+                books_borrowed_today: 5,
+                books_returned_today: 3
+            })
+        } catch (error: any) {
+            console.error('Error fetching quick stats:', error)
+        }
+    }
+
     useEffect(() => {
+        fetchDashboardSummary()
         fetchCategories()
+        fetchQuickStats()
     }, [])
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -85,6 +166,8 @@ export default function DashboardHome() {
             if (response.data.success) {
                 resetForm()
                 fetchCategories()
+                // Refresh dashboard stats after category creation
+                fetchDashboardSummary()
             } else {
                 setError(response.data.message || 'Failed to create category')
             }
@@ -139,7 +222,11 @@ export default function DashboardHome() {
         if (!confirm('Are you sure you want to delete this category?')) return
         try {
             const response = await api.delete(`/categories/${id}`)
-            if (response.data.success) fetchCategories()
+            if (response.data.success) {
+                fetchCategories()
+                // Refresh dashboard stats after category deletion
+                fetchDashboardSummary()
+            }
         } catch (error: any) {
             console.error('Error deleting category:', error)
             setError('Failed to delete category')
@@ -156,6 +243,11 @@ export default function DashboardHome() {
         setShowForm(true)
     }
 
+    // Calculate availability percentage
+    const availabilityPercentage = dashboardStats.total_books > 0
+        ? Math.round((dashboardStats.available_books / dashboardStats.total_books) * 100)
+        : 0
+
     return (
         <div className="p-4 sm:p-8">
             {/* Header */}
@@ -164,12 +256,12 @@ export default function DashboardHome() {
                 <p className="text-gray-600">Welcome to your library management system</p>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {stats.map((stat) => {
                     const Icon = stat.icon
                     return (
-                        <Card key={stat.title}>
+                        <Card key={stat.title} className="relative overflow-hidden">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
                                 <CardTitle className="text-sm text-gray-600">{stat.title}</CardTitle>
                                 <div className={`${stat.color} p-2 rounded-lg`}>
@@ -178,16 +270,84 @@ export default function DashboardHome() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                                <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
                             </CardContent>
                         </Card>
                     )
                 })}
             </div>
 
-            {/* Categories */}
+            {/* Availability Overview */}
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle>Library Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 className="font-semibold mb-4">Book Availability</h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Total Books</span>
+                                    <span className="font-semibold">{dashboardStats.total_books}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Available Books</span>
+                                    <span className="font-semibold text-green-600">{dashboardStats.available_books}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Borrowed Books</span>
+                                    <span className="font-semibold text-blue-600">
+                                        {dashboardStats.total_books - dashboardStats.available_books}
+                                    </span>
+                                </div>
+                                <div className="pt-2">
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span>Availability Rate</span>
+                                        <span>{availabilityPercentage}%</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div
+                                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${availabilityPercentage}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-4">Activity Summary</h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Active Borrowers</span>
+                                    <div className="flex items-center">
+                                        <Users className="w-4 h-4 text-purple-500 mr-1" />
+                                        <span className="font-semibold">{dashboardStats.active_borrowers}</span>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Total Transactions</span>
+                                    <div className="flex items-center">
+                                        <ArrowLeftRight className="w-4 h-4 text-orange-500 mr-1" />
+                                        <span className="font-semibold">{dashboardStats.total_transactions}</span>
+                                    </div>
+                                </div>
+                                <div className="pt-4">
+                                    <div className="flex items-center text-sm text-green-600">
+                                        <TrendingUp className="w-4 h-4 mr-1" />
+                                        <span>Library is {availabilityPercentage >= 50 ? 'well-stocked' : 'getting busy'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Categories Management */}
             <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Categories Book</CardTitle>
+                    <CardTitle>Categories Management</CardTitle>
                     <Button onClick={() => setShowForm(true)}>
                         <Plus className="w-4 h-4 mr-2" /> Add Category
                     </Button>
@@ -270,10 +430,10 @@ export default function DashboardHome() {
                                 {categories.map((category) => (
                                     <div
                                         key={category.id}
-                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg"
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                                     >
-                                        <div>
-                                            <h4 className="font-semibold">{category.category_name}</h4>
+                                        <div className="flex-1">
+                                            <h4 className="font-semibold text-gray-900">{category.category_name}</h4>
                                             {category.category_description && (
                                                 <p className="text-sm text-gray-600 mt-1">
                                                     {category.category_description}
@@ -304,34 +464,69 @@ export default function DashboardHome() {
                 </CardContent>
             </Card>
 
-            {/* Bottom Stats */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Quick Stats and Recent Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Recent Activity</CardTitle>
+                        <CardTitle>Today's Activity</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-gray-500 text-center py-8">No recent activity</p>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                                <div>
+                                    <span className="text-gray-600 block">Books Added Today</span>
+                                    <span className="text-2xl font-bold text-blue-600">{quickStats.books_added_today}</span>
+                                </div>
+                                <TrendingUp className="w-8 h-8 text-blue-500" />
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                <div>
+                                    <span className="text-gray-600 block">Books Borrowed Today</span>
+                                    <span className="text-2xl font-bold text-green-600">{quickStats.books_borrowed_today}</span>
+                                </div>
+                                <BookOpen className="w-8 h-8 text-green-500" />
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                                <div>
+                                    <span className="text-gray-600 block">Books Returned Today</span>
+                                    <span className="text-2xl font-bold text-purple-600">{quickStats.books_returned_today}</span>
+                                </div>
+                                <BookMarked className="w-8 h-8 text-purple-500" />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Quick Stats</CardTitle>
+                        <CardTitle>Library Health</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Books Added Today</span>
-                                <span className="text-gray-900">0</span>
+                            <div className="text-center p-4 bg-gray-50 rounded-lg">
+                                <div className="text-3xl font-bold text-gray-900 mb-2">
+                                    {availabilityPercentage}%
+                                </div>
+                                <div className="text-sm text-gray-600">Book Availability Rate</div>
+                                <div className="mt-2 text-xs text-gray-500">
+                                    {availabilityPercentage >= 70 ? 'Excellent' :
+                                        availabilityPercentage >= 40 ? 'Good' :
+                                            'Needs Attention'}
+                                </div>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Books Borrowed Today</span>
-                                <span className="text-gray-900">0</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Books Returned Today</span>
-                                <span className="text-gray-900">0</span>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="text-center p-3 bg-orange-50 rounded-lg">
+                                    <div className="text-lg font-bold text-orange-600">
+                                        {dashboardStats.active_borrowers}
+                                    </div>
+                                    <div className="text-xs text-gray-600">Active Readers</div>
+                                </div>
+                                <div className="text-center p-3 bg-indigo-50 rounded-lg">
+                                    <div className="text-lg font-bold text-indigo-600">
+                                        {Math.round((dashboardStats.total_transactions / Math.max(dashboardStats.total_books, 1)) * 100)}%
+                                    </div>
+                                    <div className="text-xs text-gray-600">Usage Rate</div>
+                                </div>
                             </div>
                         </div>
                     </CardContent>
