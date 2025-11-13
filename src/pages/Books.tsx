@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,111 +26,319 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Pencil, Trash2, Search, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import api from '@/utils/axios';
+
+interface Category {
+    category_id: number;
+    category_name: string;
+}
 
 interface Book {
-    id: string;
-    categoryId: string;
+    bookid: number;
+    category_id: string;
     title: string;
     description: string;
     author: string;
-    datePublished: string;
-    bookImage: string;
-    dateModified: string;
+    date_published: string;
+    date_stamped: string;
+    date_modified: string;
+    book_image: string;
+    isbn: string;
+    ebook_link: string;
+    status: 'available' | 'borrowed' | 'reserved' | 'unavailable';
+    is_archived: boolean;
 }
 
-const categories = [
-    { id: '1', name: 'Fiction' },
-    { id: '2', name: 'Non-Fiction' },
-    { id: '3', name: 'Science' },
-    { id: '4', name: 'Technology' },
-    { id: '5', name: 'History' },
-    { id: '6', name: 'Biography' },
-];
+interface PaginationInfo {
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+}
 
 export default function Books() {
     const [books, setBooks] = useState<Book[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingBook, setEditingBook] = useState<Book | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string>('');
+
+    // Pagination and filtering states
+    const [pagination, setPagination] = useState<PaginationInfo>({
+        total: 0,
+        per_page: 10,
+        current_page: 1,
+        last_page: 1
+    });
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
     const [formData, setFormData] = useState({
-        categoryId: '',
+        category_id: '',
         title: '',
         description: '',
         author: '',
-        datePublished: '',
-        bookImage: '',
+        date_published: '',
+        isbn: '',
+        ebook_link: '',
+        status: 'available' as Book['status']
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    // Status options with colors
+    const statusOptions = [
+        { value: 'available', label: 'Available', color: 'bg-green-100 text-green-800' },
+        { value: 'borrowed', label: 'Borrowed', color: 'bg-blue-100 text-blue-800' },
+        { value: 'reserved', label: 'Reserved', color: 'bg-yellow-100 text-yellow-800' },
+        { value: 'unavailable', label: 'Unavailable', color: 'bg-red-100 text-red-800' },
+    ];
 
-        if (editingBook) {
-            // Update existing book
-            setBooks(books.map(book =>
-                book.id === editingBook.id
-                    ? { ...formData, id: editingBook.id, dateModified: new Date().toISOString() }
-                    : book
-            ));
-        } else {
-            // Add new book
-            const newBook: Book = {
-                id: Date.now().toString(),
-                ...formData,
-                dateModified: new Date().toISOString(),
-            };
-            setBooks([...books, newBook]);
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery);
+            setPagination(prev => ({ ...prev, current_page: 1 })); // Reset to first page on new search
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Fetch books with pagination and filters
+    useEffect(() => {
+        fetchBooks();
+    }, [debouncedSearch, selectedCategory, pagination.current_page, pagination.per_page]);
+
+    // Fetch categories for dropdown
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+
+    const fetchBooks = async () => {
+        try {
+            const params = new URLSearchParams({
+                page: pagination.current_page.toString(),
+                per_page: pagination.per_page.toString(),
+                ...(debouncedSearch && { search: debouncedSearch }),
+                ...(selectedCategory && { category_id: selectedCategory })
+            });
+
+            const response = await api.get(`/books?${params}`);
+            if (response.data.success) {
+                setBooks(response.data.data);
+                setPagination(response.data.pagination);
+            }
+        } catch (error: any) {
+            console.error('Error fetching books:', error);
+            setError('Failed to fetch books');
         }
+    };
 
-        resetForm();
+    const fetchCategories = async () => {
+        try {
+            const response = await api.get('/dropdown/categories');
+            if (response.data.success) {
+                setCategories(response.data.data);
+            }
+        } catch (error: any) {
+            console.error('Error fetching categories:', error);
+            setError('Failed to fetch categories');
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const submitData = new FormData();
+
+            // Append form data
+            Object.entries(formData).forEach(([key, value]) => {
+                if (value) submitData.append(key, value);
+            });
+
+            // Append image file if exists
+            if (imageFile) {
+                submitData.append('book_image', imageFile);
+            }
+
+            if (editingBook) {
+                // Update book
+                const response = await api.post(`/update/books/${editingBook.bookid}`, submitData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+
+                if (response.data.success) {
+                    fetchBooks(); // Refresh the list
+                    resetForm();
+                } else {
+                    setError(response.data.message || 'Failed to update book');
+                }
+            } else {
+                // Create new book
+                const response = await api.post('/create/books', submitData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+
+                if (response.data.success) {
+                    fetchBooks(); // Refresh the list
+                    resetForm();
+                } else {
+                    setError(response.data.message || 'Failed to create book');
+                }
+            }
+        } catch (error: any) {
+            console.error('Error saving book:', error);
+            if (error.response?.data?.errors) {
+                const errors = error.response.data.errors;
+                const firstError = Object.values(errors)[0] as string[];
+                setError(firstError[0] || 'Validation failed');
+            } else {
+                setError(error.response?.data?.message || 'Failed to save book');
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const resetForm = () => {
         setFormData({
-            categoryId: '',
+            category_id: '',
             title: '',
             description: '',
             author: '',
-            datePublished: '',
-            bookImage: '',
+            date_published: '',
+            isbn: '',
+            ebook_link: '',
+            status: 'available'
         });
         setEditingBook(null);
+        setImageFile(null);
+        setImagePreview('');
         setIsDialogOpen(false);
+        setError('');
     };
 
     const handleEdit = (book: Book) => {
         setEditingBook(book);
         setFormData({
-            categoryId: book.categoryId,
+            category_id: book.category_id.toString(),
             title: book.title,
-            description: book.description,
+            description: book.description || '',
             author: book.author,
-            datePublished: book.datePublished,
-            bookImage: book.bookImage,
+            date_published: book.date_published ? book.date_published.split('T')[0] : '',
+            isbn: book.isbn || '',
+            ebook_link: book.ebook_link || '',
+            status: book.status
         });
+        if (book.book_image) {
+            setImagePreview(book.book_image);
+        }
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm('Are you sure you want to delete this book?')) {
-            setBooks(books.filter(book => book.id !== id));
+    const handleArchive = async (id: number) => {
+        if (!confirm('Are you sure you want to archive this book?')) return;
+
+        try {
+            const response = await api.post(`/archive/books/${id}`);
+            if (response.data.success) {
+                fetchBooks(); // Refresh the list
+            } else {
+                setError('Failed to archive book');
+            }
+        } catch (error: any) {
+            console.error('Error archiving book:', error);
+            setError('Failed to archive book');
         }
     };
 
-    const filteredBooks = books.filter(book =>
-        book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        book.author.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setImageFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            setImagePreview(previewUrl);
+        }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSelectChange = (name: string, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handlePageChange = (page: number) => {
+        setPagination(prev => ({ ...prev, current_page: page }));
+    };
+
+    const handlePerPageChange = (value: string) => {
+        setPagination(prev => ({
+            ...prev,
+            per_page: parseInt(value),
+            current_page: 1 // Reset to first page when changing page size
+        }));
+    };
 
     const getCategoryName = (categoryId: string) => {
-        return categories.find(cat => cat.id === categoryId)?.name || 'Unknown';
+        const category = categories.find(cat => cat.category_id.toString() === categoryId);
+        return category ? category.category_name : 'Unknown';
+    };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString();
+    };
+
+    const getStatusBadge = (status: Book['status']) => {
+        const statusOption = statusOptions.find(opt => opt.value === status);
+        return (
+            <Badge variant="outline" className={statusOption?.color}>
+                {statusOption?.label}
+            </Badge>
+        );
+    };
+
+    // Generate page numbers for pagination
+    const generatePageNumbers = () => {
+        const pages = [];
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, pagination.current_page - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(pagination.last_page, startPage + maxVisiblePages - 1);
+
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(i);
+        }
+        return pages;
     };
 
     return (
         <div className="p-8">
             <div className="mb-8 flex justify-between items-center">
                 <div>
-                    <h1 className="text-gray-900 mb-2">Books Management</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Books Management</h1>
                     <p className="text-gray-600">Manage your library collection</p>
                 </div>
                 <Button onClick={() => setIsDialogOpen(true)}>
@@ -139,62 +347,104 @@ export default function Books() {
                 </Button>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-4 border-b border-gray-200">
+            {error && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+                    {error}
+                </div>
+            )}
+
+            {/* Filters Section */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <Input
-                            placeholder="Search books by title or author..."
+                            placeholder="Search by title, author, or ISBN..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10"
                         />
                     </div>
-                </div>
 
+                    <Select
+                        value={selectedCategory}
+                        onValueChange={setSelectedCategory}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filter by category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value=" ">All Categories</SelectItem>
+                            {categories.map((category) => (
+                                <SelectItem key={category.category_id} value={category.category_id.toString()}>
+                                    {category.category_name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+
+                </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200">
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Book ID</TableHead>
                             <TableHead>Image</TableHead>
-                            <TableHead>Title</TableHead>
+                            <TableHead>Title & Description</TableHead>
                             <TableHead>Category</TableHead>
                             <TableHead>Author</TableHead>
+                            <TableHead>ISBN</TableHead>
+                            <TableHead>Status</TableHead>
                             <TableHead>Date Published</TableHead>
                             <TableHead>Last Modified</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredBooks.length === 0 ? (
+                        {books.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                                    No books found. Add your first book to get started.
+                                <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                                    No books found. {pagination.total === 0 ? 'Add your first book to get started.' : 'Try adjusting your filters.'}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredBooks.map((book) => (
-                                <TableRow key={book.id}>
-                                    <TableCell>{book.id}</TableCell>
+                            books.map((book) => (
+                                <TableRow key={book.bookid}>
+                                    <TableCell className="font-mono text-sm">{book.bookid}</TableCell>
                                     <TableCell>
-                                        {book.bookImage ? (
-                                            "integrated wait"
+                                        {book.book_image ? (
+                                            <img
+                                                src={book.book_image}
+                                                alt={book.title}
+                                                className="w-12 h-16 object-cover rounded border"
+                                            />
                                         ) : (
-                                            <div className="w-12 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
-                                                No Image
+                                            <div className="w-12 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400">
+                                                <ImageIcon className="w-6 h-6" />
                                             </div>
                                         )}
                                     </TableCell>
                                     <TableCell>
                                         <div>
-                                            <div className="text-gray-900">{book.title}</div>
-                                            <div className="text-sm text-gray-500 line-clamp-1">{book.description}</div>
+                                            <div className="font-medium text-gray-900">{book.title}</div>
+                                            {book.description && (
+                                                <div className="text-sm text-gray-500 line-clamp-1 mt-1">
+                                                    {book.description}
+                                                </div>
+                                            )}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{getCategoryName(book.categoryId)}</TableCell>
+                                    <TableCell>{getCategoryName(book.category_id)}</TableCell>
                                     <TableCell>{book.author}</TableCell>
-                                    <TableCell>{book.datePublished}</TableCell>
-                                    <TableCell>{new Date(book.dateModified).toLocaleString()}</TableCell>
+                                    <TableCell className="font-mono text-sm">{book.isbn || '-'}</TableCell>
+                                    <TableCell>
+                                        {getStatusBadge(book.status)}
+                                    </TableCell>
+                                    <TableCell>{book.date_published ? formatDate(book.date_published) : '-'}</TableCell>
+                                    <TableCell>{formatDate(book.date_modified)}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
                                             <Button
@@ -207,7 +457,7 @@ export default function Books() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handleDelete(book.id)}
+                                                onClick={() => handleArchive(book.bookid)}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
@@ -218,26 +468,76 @@ export default function Books() {
                         )}
                     </TableBody>
                 </Table>
+
+                {/* Pagination */}
+                {pagination.last_page > 1 && (
+                    <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between">
+                        <div className="text-sm text-gray-700">
+                            Showing {((pagination.current_page - 1) * pagination.per_page) + 1} to{' '}
+                            {Math.min(pagination.current_page * pagination.per_page, pagination.total)} of{' '}
+                            {pagination.total} results
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePageChange(pagination.current_page - 1)}
+                                disabled={pagination.current_page === 1}
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </Button>
+
+                            {generatePageNumbers().map(page => (
+                                <Button
+                                    key={page}
+                                    variant={pagination.current_page === page ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => handlePageChange(page)}
+                                >
+                                    {page}
+                                </Button>
+                            ))}
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePageChange(pagination.current_page + 1)}
+                                disabled={pagination.current_page === pagination.last_page}
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
 
+            {/* Add/Edit Book Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
                 setIsDialogOpen(open);
                 if (!open) resetForm();
             }}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{editingBook ? 'Edit Book' : 'Add New Book'}</DialogTitle>
                         <DialogDescription>
                             {editingBook ? 'Update the book information below.' : 'Fill in the details to add a new book to your library.'}
                         </DialogDescription>
                     </DialogHeader>
+
+                    {error && (
+                        <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+                            {error}
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit}>
                         <div className="grid gap-4 py-4">
+                            {/* Category */}
                             <div className="grid gap-2">
-                                <Label htmlFor="category">Category</Label>
+                                <Label htmlFor="category_id">Category *</Label>
                                 <Select
-                                    value={formData.categoryId}
-                                    onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                                    value={formData.category_id}
+                                    onValueChange={(value) => handleSelectChange('category_id', value)}
                                     required
                                 >
                                     <SelectTrigger>
@@ -245,75 +545,152 @@ export default function Books() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {categories.map((category) => (
-                                            <SelectItem key={category.id} value={category.id}>
-                                                {category.name}
+                                            <SelectItem key={category.category_id} value={category.category_id.toString()}>
+                                                {category.category_name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
 
+                            {/* Title */}
                             <div className="grid gap-2">
-                                <Label htmlFor="title">Title</Label>
+                                <Label htmlFor="title">Title *</Label>
                                 <Input
                                     id="title"
+                                    name="title"
                                     value={formData.title}
-                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                    onChange={handleInputChange}
                                     required
+                                    disabled={isLoading}
                                 />
                             </div>
 
+                            {/* Description */}
                             <div className="grid gap-2">
                                 <Label htmlFor="description">Description</Label>
                                 <Textarea
                                     id="description"
+                                    name="description"
                                     value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    onChange={handleInputChange}
                                     rows={3}
+                                    disabled={isLoading}
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            {/* Author and Date Published */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="author">Author</Label>
+                                    <Label htmlFor="author">Author *</Label>
                                     <Input
                                         id="author"
+                                        name="author"
                                         value={formData.author}
-                                        onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                                        onChange={handleInputChange}
                                         required
+                                        disabled={isLoading}
                                     />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="datePublished">Date Published</Label>
+                                    <Label htmlFor="date_published">Date Published</Label>
                                     <Input
-                                        id="datePublished"
+                                        id="date_published"
+                                        name="date_published"
                                         type="date"
-                                        value={formData.datePublished}
-                                        onChange={(e) => setFormData({ ...formData, datePublished: e.target.value })}
-                                        required
+                                        value={formData.date_published}
+                                        onChange={handleInputChange}
+                                        disabled={isLoading}
                                     />
                                 </div>
                             </div>
 
+                            {/* ISBN and Status */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="isbn">ISBN</Label>
+                                    <Input
+                                        id="isbn"
+                                        name="isbn"
+                                        value={formData.isbn}
+                                        onChange={handleInputChange}
+                                        placeholder="978-3-16-148410-0"
+                                        disabled={isLoading}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="status">Status *</Label>
+                                    <Select
+                                        value={formData.status}
+                                        onValueChange={(value) => handleSelectChange('status', value as Book['status'])}
+                                        required
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {statusOptions.map((status) => (
+                                                <SelectItem key={status.value} value={status.value}>
+                                                    {status.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {/* eBook Link */}
                             <div className="grid gap-2">
-                                <Label htmlFor="bookImage">Book Image URL</Label>
+                                <Label htmlFor="ebook_link">eBook Link</Label>
                                 <Input
-                                    id="bookImage"
+                                    id="ebook_link"
+                                    name="ebook_link"
                                     type="url"
-                                    value={formData.bookImage}
-                                    onChange={(e) => setFormData({ ...formData, bookImage: e.target.value })}
-                                    placeholder="https://example.com/image.jpg"
+                                    value={formData.ebook_link}
+                                    onChange={handleInputChange}
+                                    placeholder="https://example.com/ebook"
+                                    disabled={isLoading}
                                 />
+                            </div>
+
+                            {/* Book Image Upload */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="book_image">Book Image</Label>
+                                <Input
+                                    id="book_image"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    disabled={isLoading}
+                                />
+                                {imagePreview && (
+                                    <div className="mt-2">
+                                        <img
+                                            src={imagePreview}
+                                            alt="Preview"
+                                            className="w-32 h-40 object-cover rounded border"
+                                        />
+                                    </div>
+                                )}
+                                <p className="text-sm text-gray-500">
+                                    Supported formats: JPEG, PNG, JPG, GIF, SVG (Max: 2MB)
+                                </p>
                             </div>
                         </div>
 
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={resetForm}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={resetForm}
+                                disabled={isLoading}
+                            >
                                 Cancel
                             </Button>
-                            <Button type="submit">
-                                {editingBook ? 'Update Book' : 'Add Book'}
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading ? 'Saving...' : (editingBook ? 'Update Book' : 'Add Book')}
                             </Button>
                         </DialogFooter>
                     </form>

@@ -1,190 +1,177 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { BookOpen, Users, ArrowLeftRight, BookMarked, Plus, Edit, Trash2 } from 'lucide-react';
-import api from '@/utils/axios';
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+    BookOpen,
+    Users,
+    ArrowLeftRight,
+    BookMarked,
+    Plus,
+    Edit,
+    Trash2
+} from 'lucide-react'
+import api from '@/utils/axios'
 
 interface Category {
-    id: number;
-    category_name: string;
-    category_description: string;
-    who_edited?: string;
-    created_at: string;
-    updated_at: string;
+    id: number
+    category_name: string
+    category_description: string
+    who_edited?: string
+    created_at: string
+    updated_at: string
 }
 
 export default function DashboardHome() {
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [showForm, setShowForm] = useState(false);
-    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [categories, setCategories] = useState<Category[]>([])
+    const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState('')
+    const [showForm, setShowForm] = useState(false)
+    const [editingCategory, setEditingCategory] = useState<Category | null>(null)
 
-    // Form state
     const [formData, setFormData] = useState({
         category_name: '',
         category_description: '',
         who_edited: ''
-    });
+    })
 
     const stats = [
         { title: 'Total Books', value: '0', icon: BookOpen, color: 'bg-blue-500' },
         { title: 'Available Books', value: '0', icon: BookMarked, color: 'bg-green-500' },
         { title: 'Active Borrowers', value: '0', icon: Users, color: 'bg-purple-500' },
-        { title: 'Transactions', value: '0', icon: ArrowLeftRight, color: 'bg-orange-500' },
-    ];
+        { title: 'Transactions', value: '0', icon: ArrowLeftRight, color: 'bg-orange-500' }
+    ]
 
-    // Fetch categories
     const fetchCategories = async () => {
         try {
-            const response = await api.get('/categories');
+            const response = await api.get('/categories')
             if (response.data.success) {
-                setCategories(response.data.data);
+                setCategories(response.data.data)
             }
         } catch (error: any) {
-            console.error('Error fetching categories:', error);
-            setError('Failed to fetch categories');
+            console.error('Error fetching categories:', error)
+            setError('Failed to fetch categories')
         }
-    };
+    }
 
     useEffect(() => {
-        fetchCategories();
-    }, []);
+        fetchCategories()
+    }, [])
 
-    // Handle form input changes
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
+        const { name, value } = e.target
+        setFormData((prev) => ({ ...prev, [name]: value }))
+    }
 
-    // Reset form
     const resetForm = () => {
-        setFormData({
-            category_name: '',
-            category_description: '',
-            who_edited: ''
-        });
-        setEditingCategory(null);
-        setShowForm(false);
-        setError('');
-    };
+        setFormData({ category_name: '', category_description: '', who_edited: '' })
+        setEditingCategory(null)
+        setShowForm(false)
+        setError('')
+    }
 
-    // Create category
     const handleCreateCategory = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError('');
+        e.preventDefault()
+        setIsLoading(true)
+        setError('')
 
         try {
             const response = await api.post('/create/categories', {
                 ...formData,
-                who_edited: formData.who_edited || 'Admin' // Default value if empty
-            });
+                who_edited: formData.who_edited || 'Admin'
+            })
 
             if (response.data.success) {
-                resetForm();
-                fetchCategories(); // Refresh the list
+                resetForm()
+                fetchCategories()
             } else {
-                setError(response.data.message || 'Failed to create category');
+                setError(response.data.message || 'Failed to create category')
             }
         } catch (error: any) {
-            console.error('Error creating category:', error);
+            console.error('Error creating category:', error)
             if (error.response?.data?.errors) {
-                const errors = error.response.data.errors;
-                const firstError = Object.values(errors)[0] as string[];
-                setError(firstError[0] || 'Validation failed');
+                const errors = error.response.data.errors
+                const firstError = Object.values(errors)[0] as string[]
+                setError(firstError[0] || 'Validation failed')
             } else {
-                setError(error.response?.data?.message || 'Failed to create category');
+                setError(error.response?.data?.message || 'Failed to create category')
             }
         } finally {
-            setIsLoading(false);
+            setIsLoading(false)
         }
-    };
+    }
 
-    // Update category
     const handleUpdateCategory = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editingCategory) return;
+        e.preventDefault()
+        if (!editingCategory) return
 
-        setIsLoading(true);
-        setError('');
+        setIsLoading(true)
+        setError('')
 
         try {
             const response = await api.post(`/update/categories/${editingCategory.id}`, {
                 ...formData,
                 who_edited: formData.who_edited || 'Admin'
-            });
+            })
 
             if (response.data.success) {
-                resetForm();
-                fetchCategories(); // Refresh the list
+                resetForm()
+                fetchCategories()
             } else {
-                setError(response.data.message || 'Failed to update category');
+                setError(response.data.message || 'Failed to update category')
             }
         } catch (error: any) {
-            console.error('Error updating category:', error);
+            console.error('Error updating category:', error)
             if (error.response?.data?.errors) {
-                const errors = error.response.data.errors;
-                const firstError = Object.values(errors)[0] as string[];
-                setError(firstError[0] || 'Validation failed');
+                const errors = error.response.data.errors
+                const firstError = Object.values(errors)[0] as string[]
+                setError(firstError[0] || 'Validation failed')
             } else {
-                setError(error.response?.data?.message || 'Failed to update category');
+                setError(error.response?.data?.message || 'Failed to update category')
             }
         } finally {
-            setIsLoading(false);
+            setIsLoading(false)
         }
-    };
+    }
 
-    // Delete category
     const handleDeleteCategory = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this category?')) return;
-
+        if (!confirm('Are you sure you want to delete this category?')) return
         try {
-            // Note: You'll need to add the delete endpoint in your backend
-            const response = await api.delete(`/categories/${id}`);
-            if (response.data.success) {
-                fetchCategories(); // Refresh the list
-            }
+            const response = await api.delete(`/categories/${id}`)
+            if (response.data.success) fetchCategories()
         } catch (error: any) {
-            console.error('Error deleting category:', error);
-            setError('Failed to delete category');
+            console.error('Error deleting category:', error)
+            setError('Failed to delete category')
         }
-    };
+    }
 
-    // Start editing a category
     const startEdit = (category: Category) => {
-        setEditingCategory(category);
+        setEditingCategory(category)
         setFormData({
             category_name: category.category_name,
             category_description: category.category_description,
             who_edited: category.who_edited || ''
-        });
-        setShowForm(true);
-    };
+        })
+        setShowForm(true)
+    }
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
+            {/* Header */}
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h1>
                 <p className="text-gray-600">Welcome to your library management system</p>
             </div>
 
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {stats.map((stat) => {
-                    const Icon = stat.icon;
+                    const Icon = stat.icon
                     return (
                         <Card key={stat.title}>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm text-gray-600">
-                                    {stat.title}
-                                </CardTitle>
+                                <CardTitle className="text-sm text-gray-600">{stat.title}</CardTitle>
                                 <div className={`${stat.color} p-2 rounded-lg`}>
                                     <Icon className="w-4 h-4 text-white" />
                                 </div>
@@ -193,18 +180,16 @@ export default function DashboardHome() {
                                 <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
                             </CardContent>
                         </Card>
-                    );
+                    )
                 })}
             </div>
 
-
-            {/* Categories Section */}
-            <Card className='mb-6'>
+            {/* Categories */}
+            <Card className="mb-6">
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Categories Management</CardTitle>
+                    <CardTitle>Categories Book</CardTitle>
                     <Button onClick={() => setShowForm(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Category
+                        <Plus className="w-4 h-4 mr-2" /> Add Category
                     </Button>
                 </CardHeader>
                 <CardContent>
@@ -219,7 +204,10 @@ export default function DashboardHome() {
                                     {error}
                                 </div>
                             )}
-                            <form onSubmit={editingCategory ? handleUpdateCategory : handleCreateCategory} className="space-y-4">
+                            <form
+                                onSubmit={editingCategory ? handleUpdateCategory : handleCreateCategory}
+                                className="space-y-4"
+                            >
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="category_name">Category Name *</Label>
@@ -260,7 +248,7 @@ export default function DashboardHome() {
                                 </div>
                                 <div className="flex gap-2">
                                     <Button type="submit" disabled={isLoading}>
-                                        {isLoading ? 'Saving...' : (editingCategory ? 'Update Category' : 'Create Category')}
+                                        {isLoading ? 'Saving...' : editingCategory ? 'Update Category' : 'Create Category'}
                                     </Button>
                                     <Button type="button" variant="outline" onClick={resetForm} disabled={isLoading}>
                                         Cancel
@@ -272,13 +260,18 @@ export default function DashboardHome() {
 
                     {/* Categories List */}
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Existing Categories ({categories.length})</h3>
+                        <h3 className="text-lg font-semibold">
+                            Existing Categories ({categories.length})
+                        </h3>
                         {categories.length === 0 ? (
                             <p className="text-gray-500 text-center py-8">No categories found</p>
                         ) : (
                             <div className="space-y-2">
                                 {categories.map((category) => (
-                                    <div key={category.id} className="flex items-center justify-between p-4 border rounded-lg">
+                                    <div
+                                        key={category.id}
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg"
+                                    >
                                         <div>
                                             <h4 className="font-semibold">{category.category_name}</h4>
                                             {category.category_description && (
@@ -291,12 +284,8 @@ export default function DashboardHome() {
                                                 {category.who_edited && ` • Edited by: ${category.who_edited}`}
                                             </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => startEdit(category)}
-                                            >
+                                        <div className="flex gap-2 mt-3 sm:mt-0">
+                                            <Button variant="outline" size="sm" onClick={() => startEdit(category)}>
                                                 <Edit className="w-4 h-4" />
                                             </Button>
                                             <Button
@@ -315,6 +304,7 @@ export default function DashboardHome() {
                 </CardContent>
             </Card>
 
+            {/* Bottom Stats */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <Card>
                     <CardHeader>
@@ -347,8 +337,6 @@ export default function DashboardHome() {
                     </CardContent>
                 </Card>
             </div>
-
-
         </div>
-    );
+    )
 }
