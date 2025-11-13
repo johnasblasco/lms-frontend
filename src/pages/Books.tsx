@@ -304,14 +304,7 @@ export default function Books() {
         return new Date(dateString).toLocaleDateString();
     };
 
-    const getStatusBadge = (status: Book['status']) => {
-        const statusOption = statusOptions.find(opt => opt.value === status);
-        return (
-            <Badge variant="outline" className={statusOption?.color}>
-                {statusOption?.label}
-            </Badge>
-        );
-    };
+
 
     // Generate page numbers for pagination
     const generatePageNumbers = () => {
@@ -437,7 +430,7 @@ export default function Books() {
                                     <TableCell>{book.author}</TableCell>
                                     <TableCell className="font-mono text-sm">{book.isbn || '-'}</TableCell>
                                     <TableCell>
-                                        {getStatusBadge(book.status)}
+                                        {book.status}
                                     </TableCell>
                                     <TableCell>{book.date_published ? formatDate(book.date_published) : '-'}</TableCell>
                                     <TableCell>{formatDate(book.date_modified)}</TableCell>
