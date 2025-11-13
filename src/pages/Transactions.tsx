@@ -35,7 +35,7 @@ interface Book {
 }
 
 interface Transaction {
-    id: number;
+    transaction_id: number;
     book_id: number;
     borrower_name: string;
     borrow_date: string;
@@ -157,7 +157,7 @@ export default function Transactions() {
 
             if (editingTransaction) {
                 // Update transaction
-                const response = await api.post(`/update/transactions/${editingTransaction.id}`, submitData);
+                const response = await api.post(`/update/transactions/${editingTransaction.transaction_id}`, submitData);
 
                 if (response.data.success) {
                     fetchTransactions(); // Refresh the list
@@ -385,8 +385,8 @@ export default function Transactions() {
                             </TableRow>
                         ) : (
                             transactions.map((transaction) => (
-                                <TableRow key={transaction.id}>
-                                    <TableCell className="font-mono text-sm">{transaction.id}</TableCell>
+                                <TableRow key={transaction.transaction_id}>
+                                    <TableCell className="font-mono text-sm">{transaction.transaction_id}</TableCell>
                                     <TableCell className="font-medium">
                                         {transaction.book?.title || getBookTitle(transaction.book_id)}
                                     </TableCell>
@@ -411,7 +411,7 @@ export default function Transactions() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handleArchive(transaction.id)}
+                                                onClick={() => handleArchive(transaction.transaction_id)}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>

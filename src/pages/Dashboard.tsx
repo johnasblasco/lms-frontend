@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, BookOpen, ArrowLeftRight, LogOut, Menu, X } from 'lucide-react';
 import DashboardHome from './DashboardHome';
 import Books from './Books';
 import Transactions from './Transactions';
+import { useNavigate } from 'react-router-dom';
 import api from '@/utils/axios';
 
 type NavItem = 'dashboard' | 'books' | 'transactions';
 
 export default function Dashboard() {
+    const navigate = useNavigate();
     const [activeNav, setActiveNav] = useState<NavItem>('dashboard');
     const [user, setUser] = useState<any>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,7 +28,7 @@ export default function Dashboard() {
         } finally {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            navigate('/');
         }
     };
 
