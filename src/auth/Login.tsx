@@ -56,11 +56,14 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-            <Card className="w-full max-w-md">
+        <div className="min-h-screen flex items-center justify-center bg-[url('bg.jpg')] bg-cover bg-center p-4">
+            {/* Gradient overlay for better contrast */}
+            <div className="absolute inset-0 bg-black/20"></div>
+
+            <Card className="w-full max-w-md brightnes-110 shadow-2xl border-4 border-black/10 bg-white/90 z-100">
                 <CardHeader className="space-y-4">
                     <div className="flex justify-center">
-                        <div className="bg-indigo-600 p-3 rounded-full">
+                        <div className="bg-blue-600 p-3 rounded-full">
                             <BookOpen className="w-8 h-8 text-white" />
                         </div>
                     </div>
@@ -102,7 +105,7 @@ export default function Login() {
                         </div>
                         <Button
                             type="submit"
-                            className="w-full"
+                            className="w-full bg-blue-600 hover:bg-blue-700 hover:cursor-pointer"
                             disabled={isLoading}
                         >
                             {isLoading ? 'Signing In...' : 'Sign In'}
