@@ -16,7 +16,7 @@ import {
 import api from '@/utils/axios'
 
 interface Category {
-    id: number
+    category_id: number
     category_name: string
     category_description: string
     who_edited?: string
@@ -193,7 +193,7 @@ export default function DashboardHome() {
         setError('')
 
         try {
-            const response = await api.post(`/update/categories/${editingCategory.id}`, {
+            const response = await api.post(`/update/categories/${editingCategory.category_id}`, {
                 ...formData,
                 who_edited: formData.who_edited || 'Admin'
             })
@@ -221,7 +221,7 @@ export default function DashboardHome() {
     const handleDeleteCategory = async (id: number) => {
         if (!confirm('Are you sure you want to delete this category?')) return
         try {
-            const response = await api.delete(`/categories/${id}`)
+            const response = await api.post(`/archive/categories/${id}`)
             if (response.data.success) {
                 fetchCategories()
                 // Refresh dashboard stats after category deletion
@@ -429,7 +429,7 @@ export default function DashboardHome() {
                             <div className="space-y-2">
                                 {categories.map((category) => (
                                     <div
-                                        key={category.id}
+                                        key={category.category_id}
                                         className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                                     >
                                         <div className="flex-1">
@@ -451,7 +451,7 @@ export default function DashboardHome() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handleDeleteCategory(category.id)}
+                                                onClick={() => handleDeleteCategory(category.category_id)}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
