@@ -36,8 +36,9 @@ interface Category {
 }
 
 interface Book {
-    bookid: number;
+    book_id: number;
     category_id: string;
+    category_name?: string;
     title: string;
     description: string;
     author: string;
@@ -170,7 +171,7 @@ export default function Books() {
 
             if (editingBook) {
                 // Update book
-                const response = await api.post(`/update/books/${editingBook.bookid}`, submitData, {
+                const response = await api.post(`/update/books/${editingBook.book_id}`, submitData, {
                     headers: {
                         'Content-Type': 'multipart/form-data',
                     },
@@ -299,11 +300,6 @@ export default function Books() {
         }));
     };
 
-    const getCategoryName = (categoryId: string) => {
-        const category = categories.find(cat => cat.category_id.toString() === categoryId);
-        return category ? category.category_name : 'Unknown';
-    };
-
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString();
     };
@@ -412,8 +408,8 @@ export default function Books() {
                             </TableRow>
                         ) : (
                             books.map((book) => (
-                                <TableRow key={book.bookid}>
-                                    <TableCell className="font-mono text-sm">{book.bookid}</TableCell>
+                                <TableRow key={book.book_id}>
+                                    <TableCell className="font-mono text-sm">{book.book_id}</TableCell>
                                     <TableCell>
                                         {book.book_image ? (
                                             <img
@@ -437,7 +433,7 @@ export default function Books() {
                                             )}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{getCategoryName(book.category_id)}</TableCell>
+                                    <TableCell>{book.category_name}</TableCell>
                                     <TableCell>{book.author}</TableCell>
                                     <TableCell className="font-mono text-sm">{book.isbn || '-'}</TableCell>
                                     <TableCell>
@@ -457,7 +453,7 @@ export default function Books() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handleArchive(book.bookid)}
+                                                onClick={() => handleArchive(book.book_id)}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>

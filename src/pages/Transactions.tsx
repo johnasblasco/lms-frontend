@@ -32,7 +32,6 @@ import api from '@/utils/axios';
 interface Book {
     book_id: number;
     title: string;
-    status: string;
 }
 
 interface Transaction {
@@ -309,15 +308,6 @@ export default function Transactions() {
         return pages;
     };
 
-    // Get available books for borrowing (only available books for new transactions)
-    const getAvailableBooks = () => {
-        if (editingTransaction) {
-            // When editing, show all books including the currently selected one
-            return books;
-        }
-        // For new transactions, only show available books
-        return books.filter(book => book.status === 'available');
-    };
 
     return (
         <div className="p-8">
@@ -509,9 +499,9 @@ export default function Transactions() {
                                         <SelectValue placeholder="Select a book" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {getAvailableBooks().map((book) => (
+                                        {books.map((book) => (
                                             <SelectItem key={book.book_id} value={book.book_id.toString()}>
-                                                {book.title} {book.status !== 'available' && `(${book.status})`}
+                                                {book.title} 
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
